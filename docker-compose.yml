@@ -1,0 +1,30 @@
+services:
+  # The Application
+  app:
+    build: .
+    container_name: tardigo-app
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=tardigo
+    # For now, we just run the simulation and exit
+    command: ./tardigo-sim
+
+  # The Time-Series Database
+  db:
+    image: timescale/timescaledb:latest-pg14
+    container_name: tardigo-db
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=tardigo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres_data:
