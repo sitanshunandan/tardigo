@@ -45,15 +45,38 @@ func main() {
 
 // HandleGetCurrentCapacity returns the latest bio-data for a user
 func (s *Server) HandleGetCurrentCapacity(w http.ResponseWriter, r *http.Request) {
-	// In a real app, we'd get this from a JWT token. For now, hardcode.
+	// In the future, this comes from the URL or Auth Token
 	userID := "user_001"
 
-	// We need to implement a "GetLatest" method in our repo next!
-	// For now, we return a placeholder to verify the server works.
-	response := map[string]string{
-		"status":  "online",
-		"user":    userID,
-		"message": "Brain-Computer Interface Ready",
+	// 1. Fetch real data from the Brain (DB)
+	state, err := s.repo.GetLatestCapacity(r.Context(), userID)
+	if err != nil {
+		// If no data exists yet (or DB error)
+		http.Error(w, "Biological signal lost: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// 2. Construct the Response
+	// We add "Recommendation" logic here to show System Design maturity.
+	// We separate "Data" (the number) from "Insight" (the string).
+	var recommendation string
+	if state.TotalCapacity > 0.8 {
+		recommendation = "Deep Work / High Focus (Coding, Math)"
+	} else if state.TotalCapacity < 0.3 {
+		recommendation = "Rest / Recovery (NSDR, Sleep)"
+	} else {
+		recommendation = "Admin / Low Stakes (Email, Meetings)"
+	}
+
+	response := map[string]interface{}{
+		"user":           userID,
+		"status":         "connected",
+		"capacity_score": state.TotalCapacity,
+		"components": map[string]float64{
+			"freshness": state.ProcessS,
+			"circadian": state.ProcessC,
+		},
+		"recommendation": recommendation,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

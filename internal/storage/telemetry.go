@@ -51,3 +51,28 @@ func (r *TelemetryRepository) Save(ctx context.Context, userID string, timestamp
 	_, err := r.conn.Exec(ctx, query, timestamp, userID, state.ProcessS, state.ProcessC, state.TotalCapacity)
 	return err
 }
+
+// GetLatestCapacity fetches the most recent bio-state for a user.
+func (r *TelemetryRepository) GetLatestCapacity(ctx context.Context, userID string) (*biomodel.BioState, error) {
+	query := `
+		SELECT process_s, process_c, overall_capacity 
+		FROM bio_telemetry 
+		WHERE user_id = $1 
+		ORDER BY time DESC 
+		LIMIT 1
+	`
+
+	var state biomodel.BioState
+	// We scan the database columns directly into our Go struct fields
+	err := r.conn.QueryRow(ctx, query, userID).Scan(
+		&state.ProcessS,
+		&state.ProcessC,
+		&state.TotalCapacity,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &state, nil
+}
