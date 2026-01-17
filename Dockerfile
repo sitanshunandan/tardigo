@@ -1,29 +1,23 @@
 # STAGE 1: Build
 FROM golang:1.25-alpine AS builder
-
-# Install git (required for fetching dependencies)
 RUN apk add --no-cache git
-
 WORKDIR /app
-
-# Cache dependencies (Docker Layer Caching)
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
-
-# Copy source code
 COPY . .
 
-# Build the binary
-# We build the simulator for now. Later we will change this to the server.
+# Build Simulator
 RUN CGO_ENABLED=0 GOOS=linux go build -o tardigo-sim ./cmd/simulator
+
+# Build API Server (NEW)
+RUN CGO_ENABLED=0 GOOS=linux go build -o tardigo-api ./cmd/api
 
 # STAGE 2: Run
 FROM alpine:latest
-
 WORKDIR /root/
 
-# Copy the binary from the builder stage
+# Copy both binaries
 COPY --from=builder /app/tardigo-sim .
+COPY --from=builder /app/tardigo-api .
 
-# Command to run
-CMD ["./tardigo-sim"]
+# We don't set a default CMD anymore because docker-compose will decide which one to run

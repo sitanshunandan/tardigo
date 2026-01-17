@@ -1,19 +1,5 @@
 services:
-  # The Application
-  app:
-    build: .
-    container_name: tardigo-app
-    depends_on:
-      - db
-    environment:
-      - DB_HOST=db
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=tardigo
-    # For now, we just run the simulation and exit
-    command: ./tardigo-sim
-
-  # The Time-Series Database
+  # 1. The Database
   db:
     image: timescale/timescaledb:latest-pg14
     container_name: tardigo-db
@@ -25,6 +11,34 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # 2. The Simulator (Runs once to seed data)
+  simulator:
+    build: .
+    container_name: tardigo-sim
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=tardigo
+    command: ./tardigo-sim
+
+  # 3. The API Server (The new brain)
+  api:
+    build: .
+    container_name: tardigo-api
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=tardigo
+    ports:
+      - "8080:8080" # Expose port 8080 to your local machine
+    command: ./tardigo-api
 
 volumes:
   postgres_data:

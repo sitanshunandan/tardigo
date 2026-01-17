@@ -65,7 +65,6 @@ func main() {
 		}
 	}
 
-	fmt.Println("--- Ingestion Complete. Sleeping... ---")
+	fmt.Println("--- Ingestion Complete. Exiting... ---")
 	// Keep container alive so we can check logs
-	select {}
 }
