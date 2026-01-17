@@ -63,3 +63,18 @@ func (b *BioParams) CalculateState(targetTime time.Time) BioState {
 		TotalCapacity: math.Max(0.0, math.Min(1.0, totalCapacity)), // Clamp between 0-1
 	}
 }
+
+// Task represents a unit of work to be scheduled.
+type Task struct {
+	Name     string `json:"name"`
+	Duration int    `json:"duration_minutes"` // e.g., 60
+	Effort   int    `json:"effort_level"`     // 1-10 (10 = Hardest)
+}
+
+// ScheduleItem is a task assigned to a specific time slot.
+type ScheduleItem struct {
+	StartTime    string  `json:"start_time"`
+	TaskName     string  `json:"task_name"`
+	PredictedCap float64 `json:"predicted_capacity"`
+	FitScore     string  `json:"fit_score"` // "Perfect", "Good", "Bad"
+}
