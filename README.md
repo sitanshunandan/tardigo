@@ -1,9 +1,8 @@
 # TardiGo: Biological Task Scheduler
 TardiGo is a distributed system that schedules tasks based on your **biological capacity** rather than just clock time. It implements the **Borbély Two-Process Model** of sleep regulation to simulate human fatigue and assigns high-effort tasks to mathematically optimal productivity windows.
 
-**Link to project:** http://recruiters-love-seeing-live-demos.com/
+**Link to project:** [TBU]
 
-![alt tag](http://placecorgi.com/1200/650)
 
 ## How It's Made:
 
