@@ -57,7 +57,7 @@ docker-compose up -d
 ./tardigo.exe plan "Write Kernel Module" 60 9
 ```
 
-Observation: TardiGo will refuse to book this now. It scans the future and finds a slot (e.g., 10:00 AM) where your predicted capacity is >85%, protecting you from working when inefficient.
+This command checks if, based on current capacity, a "Write Kernel Module" task of level 9 complexity for 60 minutes is feasible. If yes, then when is the earliest time slot
 
 ## Roadmap
 
