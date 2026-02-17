@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	// TODO: REPLACE THIS with your actual module name from go.mod
-	"github.com/sitanshunandan/tardigo/internal/biomodel"
+	// TODO: Verify this matches your go.mod module name exactly
+	"github.com/YOUR_USERNAME/tardigo/internal/biomodel"
 )
 
 func main() {
@@ -21,15 +21,18 @@ func main() {
 		server.WithLogging(),
 	)
 
-	// 2. Define the Tool Schema
-	// We tell the AI exactly what "OptimizeSchedule" expects.
+	// 2. Define the Tool
+	// We use the basic constructor and then manually enhance the schema for the complex 'tasks' array
 	scheduleTool := mcp.NewTool("plan_biological_schedule",
-		mcp.WithDescription("Generates an optimal daily schedule based on biological energy (Circadian Rhythms). Use this to plan tasks when the user is most alert."),
-		mcp.WithStringArgument("wake_time", "The time the user woke up today (RFC3339 format, e.g. 2024-02-17T07:00:00Z)."),
-		// We define the complex 'tasks' array manually to ensure strict typing for the AI
+		mcp.WithDescription("Generates an optimal daily schedule based on biological energy. Use this to plan tasks."),
+		mcp.WithString("wake_time",
+			mcp.Required(),
+			mcp.Description("The time the user woke up today (RFC3339 format, e.g. 2026-02-17T07:00:00Z)."),
+		),
 	)
 
-	// Manually adding the array schema for tasks since it's a complex object
+	// Manually inject the complex array schema for 'tasks'
+	// The library's helpers are great for simple fields, but for a []Struct, this is cleaner.
 	scheduleTool.InputSchema.Properties["tasks"] = map[string]interface{}{
 		"type": "array",
 		"items": map[string]interface{}{
@@ -37,53 +40,59 @@ func main() {
 			"properties": map[string]interface{}{
 				"name":             map[string]interface{}{"type": "string"},
 				"duration_minutes": map[string]interface{}{"type": "integer"},
-				"effort_level":     map[string]interface{}{"type": "integer", "description": "1-10 scale (10=Highest Effort)"},
+				"effort_level":     map[string]interface{}{"type": "integer", "description": "1-10 scale"},
 			},
 			"required": []string{"name", "duration_minutes", "effort_level"},
 		},
 	}
+	// Add 'tasks' to the required list
+	scheduleTool.InputSchema.Required = append(scheduleTool.InputSchema.Required, "tasks")
 
 	// 3. Register the Handler
 	s.AddTool(scheduleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// A. Parse Arguments
+		// A. Parse Arguments safely
+		// request.Params.Arguments is a map[string]interface{}.
+		// We marshal it back to JSON to unmarshal it into our strong Go struct.
+		jsonArgs, err := json.Marshal(request.Params.Arguments)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to parse arguments: %v", err)), nil
+		}
+
 		var args struct {
 			WakeTime string          `json:"wake_time"`
 			Tasks    []biomodel.Task `json:"tasks"`
 		}
-		if err := json.Unmarshal(request.Params.Arguments, &args); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments: %v", err)), nil
+
+		if err := json.Unmarshal(jsonArgs, &args); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid arguments structure: %v", err)), nil
 		}
 
-		// B. Parse Time (Default to Now if invalid)
+		// B. Parse Time
 		wakeTime, err := time.Parse(time.RFC3339, args.WakeTime)
 		if err != nil {
-			return mcp.NewToolResultError("Invalid wake_time format. Use RFC3339."), nil
+			return mcp.NewToolResultError("Invalid wake_time format. Use RFC3339 (e.g., 2026-02-17T07:00:00Z)."), nil
 		}
 
-		// C. Setup Biological Parameters (The "World Model")
-		// In a real system, you might fetch these from your DB (internal/storage)
+		// C. Setup World Model
 		bioParams := biomodel.BioParams{
 			WakeTime:      wakeTime,
-			ChronotypeLag: 0.0,  // Assuming normal chronotype for now
-			FatigueRate:   16.0, // Standard fatigue rate
+			ChronotypeLag: 0.0,
+			FatigueRate:   16.0,
 		}
 
-		// D. Run the Heavy Lifting (Your Scheduler Logic)
-		// Note: We start scheduling from "Now" or "WakeTime", depending on your logic.
-		// Let's assume we start scheduling from the moment the user woke up + 1 hour.
+		// D. Run Scheduler
+		// Schedule starting 1 hour after wake time
 		startSim := wakeTime.Add(1 * time.Hour)
-
 		schedule := biomodel.OptimizeSchedule(args.Tasks, startSim, bioParams)
 
-		// E. Return the Result as JSON
-		responseBytes, _ := json.Marshal(schedule)
+		// E. Return Result
+		responseBytes, _ := json.MarshalIndent(schedule, "", "  ")
 		return mcp.NewToolResultText(string(responseBytes)), nil
 	})
 
 	// 4. Start the Server (Stdio Mode)
-	// This allows Claude Desktop or Python Scripts to talk to it via Standard Input/Output
-	fmt.Println("Starting TardiGo MCP Server on Stdio...")
-	if err := s.ServeStdio(); err != nil {
-		panic(err)
+	// Corrected API call: server.ServeStdio(s)
+	if err := server.ServeStdio(s); err != nil {
+		fmt.Printf("Server error: %v\n", err)
 	}
 }
