@@ -13,6 +13,7 @@ The system is built as a distributed microservices architecture to mimic a biolo
 1.  **The Nervous System (Simulator):** A background Go service that mathematically models fatigue. It calculates **Process S** (Homeostatic Sleep Pressure) using exponential decay functions and **Process C** (Circadian Rhythm) using sinusoidal oscillators. It writes this telemetry to the database in real-time.
 2.  **The Memory (TimescaleDB):** A PostgreSQL database optimized for time-series data. It stores the biological metrics (HRV, Sleep Pressure) allowing the system to query historical and predicted future states.
 3.  **The Cortex (API & Scheduler):** A REST API that acts as the decision engine. It ingests a list of tasks (weighted by cognitive load 1-10) and uses a **Greedy Heuristic Algorithm** to map the hardest tasks to the highest capacity windows available.
+4.  **The Hypothalamus (MCP Server):** An [MCP](https://github.com/mark3labs/mcp-go) server that acts as a cognitive planning agent. It exposes a `plan_biological_schedule` tool, enabling intelligent agents (like large language models) to interact with TardiGo's biological model to generate optimal task schedules based on real-time fatigue and circadian rhythms.
 
 ```mermaid
 graph LR
@@ -20,6 +21,11 @@ graph LR
     CLI[Go CLI Tool] -->|Request Plan| API[Go API Cortex]
     API -->|Query Bio-State| DB
     API -->|Return Optimized Schedule| CLI
+    LLM[Large Language Model] -->|Call plan_biological_schedule tool| MCP[MCP Server Hypothalamus]
+    MCP -->|Request Bio-State| API
+    API -->|Return Bio-State| MCP
+    MCP -->|Generate Optimized Schedule| API
+    API -->|Return Optimized Schedule| LLM
 ```
 
 ## Optimizations

@@ -1,0 +1,23 @@
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "plan_biological_schedule",
+      "arguments": {
+        "wake_time": "2026-02-17T07:00:00Z",
+        "tasks": [
+          {
+            "name": "Deep Work - Kernel Study",
+            "duration_minutes": 120,
+            "effort_level": 10
+          },
+          {
+            "name": "Email Triage",
+            "duration_minutes": 30,
+            "effort_level": 2
+          }
+        ]
+      }
+    }
+  }

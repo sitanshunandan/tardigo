@@ -10,7 +10,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	// TODO: Verify this matches your go.mod module name exactly
-	"github.com/YOUR_USERNAME/tardigo/internal/biomodel"
+	"github.com/sitanshunandan/tardigo/internal/biomodel"
 )
 
 func main() {
