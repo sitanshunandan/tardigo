@@ -1,71 +1,79 @@
 import asyncio
 import os
+import operator
+from typing import Annotated, TypedDict, Literal
 from dotenv import load_dotenv
+
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver # For the memory bank
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, ToolMessage
 
-load_dotenv() # Loads your OPENAI_API_KEY from .env
+load_dotenv()
 
-server_params = StdioServerParameters(
-    command=r"C:\Users\anshu\code\tardigo\mcp-server.exe",
-    args=[],
-    env=None
-)
+class AgentState(TypedDict):
+    messages: Annotated[list[BaseMessage], operator.add]
 
-async def run_reasoning_agent():
+server_params = StdioServerParameters(command=r"C:\Users\anshu\code\tardigo\mcp-server.exe", args=[], env=None)
+
+async def main():
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             
-            # 1. Fetch tool definitions from your Go Server
+            # 1. Setup Tools & LLM
             mcp_tools = await session.list_tools()
-            
-            # 2. Convert MCP tools to a format OpenAI understands
-            # We map the Go tool definition to the LLM's "tools" parameter
-            llm_tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.inputSchema,
-                    },
-                }
-                for t in mcp_tools.tools
-            ]
+            llm_tools = [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in mcp_tools.tools]
+            llm = ChatOpenAI(model="gpt-4o").bind_tools(llm_tools)
 
-            llm = ChatOpenAI(model="gpt-4o") # Use gpt-4o for best reasoning
-            
-            # 3. The Conversation
-            #user_input = "I woke up at 7:30 AM. I need to spend 90 minutes on a 'Difficult Kernel Bug' (level 9) and 30 minutes on 'Email' (level 2). When should I do them?"
-            user_input = """
-                I woke up at 8:00 AM. I have a very busy day:
-                1. 'Refactor Go Concurrency' (90 mins, Level 10) - Very hard.
-                2. 'Weekly Sync' (30 mins, Level 3) - Easy.
-                3. 'Write Documentation' (60 mins, Level 5) - Medium.
-                Please plan these to maximize my brain power.
-            """            
-            print(f"\nUser: {user_input}")
+            # 2. Define Nodes
+            def call_model(state: AgentState):
+                return {"messages": [llm.invoke(state["messages"])]}
 
-            # Step A: LLM decides which tool to call
-            messages = [HumanMessage(content=user_input)]
-            response = llm.invoke(messages, tools=llm_tools)
-            
-            if response.tool_calls:
-                for tool_call in response.tool_calls:
-                    print(f"\nAgent is thinking... 'I should use the {tool_call['name']} tool.'")
-                    
-                    # Step B: Python executes the Go tool on behalf of the LLM
+            async def call_tools(state: AgentState):
+                last_message = state["messages"][-1]
+                results = []
+                for tool_call in last_message.tool_calls:
                     result = await session.call_tool(tool_call["name"], tool_call["args"])
-                    
-                    # Step C: Feed the Go output back to the LLM for a final natural language answer
-                    messages.append(response)
-                    messages.append(ToolMessage(content=result.content[0].text, tool_call_id=tool_call["id"]))
-                    
-                    final_answer = llm.invoke(messages)
-                    print(f"\nAgent: {final_answer.content}")
+                    results.append(ToolMessage(tool_call_id=tool_call["id"], content=result.content[0].text))
+                return {"messages": results}
+
+            def should_continue(state: AgentState) -> Literal["tools", END]:
+                if state["messages"][-1].tool_calls: return "tools"
+                return END
+
+            # 3. Build Graph with Memory
+            workflow = StateGraph(AgentState)
+            workflow.add_node("agent", call_model)
+            workflow.add_node("tools", call_tools)
+            workflow.set_entry_point("agent")
+            workflow.add_conditional_edges("agent", should_continue)
+            workflow.add_edge("tools", "agent")
+            
+            # MemorySaver keeps your GRE context alive!
+            memory = MemorySaver()
+            app = workflow.compile(checkpointer=memory)
+
+            # 4. THE INTERACTIVE LOOP
+            print("--- TardiGo Agent Connected ---")
+            print("Type 'exit' or 'quit' to stop.")
+            
+            # config is required for memory to work
+            config = {"configurable": {"thread_id": "GRE_PREP_SESSION_1"}}
+
+            while True:
+                user_input = input("\nYou: ")
+                if user_input.lower() in ["exit", "quit"]:
+                    break
+
+                inputs = {"messages": [HumanMessage(content=user_input)]}
+                
+                async for output in app.astream(inputs, config, stream_mode="updates"):
+                    for node, data in output.items():
+                        if node == "agent" and data["messages"][-1].content:
+                            print(f"\nTardiGo: {data['messages'][-1].content}")
 
 if __name__ == "__main__":
-    asyncio.run(run_reasoning_agent())
+    asyncio.run(main())

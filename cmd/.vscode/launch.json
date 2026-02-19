@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch TardiGo (Main)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/tardigo",
+            "env": {},
+            "args": [],
+            "showLog": true
+        },
+        {
+            "name": "Debug Unit Tests",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${fileDirname}",
+            "env": {},
+            "args": [],
+            "showLog": true
+        }
+    ]
+}
